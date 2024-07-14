@@ -1,0 +1,335 @@
+---
+title: "Bank Portuguese Campaigns "
+author: "Dimas Aditya"
+date: 
+output: 
+  html_document:
+    theme: flatly
+    toc: yes
+    toc_float:
+      collapsed: true
+---
+
+
+```{r include=FALSE}
+library(stringr)
+library(dplyr)
+library(ggplot2)
+library(DT)
+library(png)
+library(patchwork)
+library(png)
+```
+
+
+```{r echo=FALSE}
+img <- readPNG("data_input/banco-portugal.png")
+
+# Tentukan faktor perbesaran
+scale_factor <- 2
+
+# Tentukan ukuran gambar asli
+img_width <- 1
+img_height <- 1
+
+# Hitung koordinat agar gambar diperbesar dan berada di tengah
+left <- (1 - img_width * scale_factor) / 2
+right <- left + img_width * scale_factor
+bottom <- (1 - img_height * scale_factor) / 2
+top <- bottom + img_height * scale_factor
+
+# Tampilkan gambar dengan ukuran yang diperbesar
+plot.new()
+rasterImage(img, left, bottom, right, top, interpolate = FALSE)
+
+```
+
+
+# Introduction
+The data is related with direct marketing campaigns (phone calls) of a Portuguese banking institution. The classification goal is to predict if the client will subscribe a term deposit (variable y).
+The data is related with direct marketing campaigns of a Portuguese banking institution. The marketing campaigns were based on phone calls. Often, more than one contact to the same client was required, in order to access if the product (bank term deposit) would be ('yes') or not ('no') subscribed. 
+
+source: https://archive.ics.uci.edu/dataset/222/bank+marketing
+
+
+
+#### Business Question
+1. How many times on average can a campaign reach success?
+
+2. Recommended best campaign segments?
+
+3. How much savings does someone who is successful in carrying out a campaign have on average?
+
+#### Variable Description
+
+```{r echo=FALSE}
+bank <- read.csv("data_input/bankcol.csv")
+datatable(bank, options = list(
+  scrollX = TRUE, pageLength = 5))
+```
+
+
+# 1. Data Preparation
+
+### 1.1 Prerequisites
+### 1.2 Importing Data
+
+```{r}
+data <- read.csv("data_input/bank.csv", header = FALSE, sep = ";", quote = "\"")
+```
+
+```{r echo=FALSE}
+colnames(data) <- c("age", "job", "marital", "education", "default", "balance", "housing", 
+                    "loan", "contact", "day", "month", "duration", "campaign", "pdays", 
+                    "previous", "poutcome", "y")
+data1 <- data[-1, ]
+head(data1)
+```
+First things first, let's read our data.
+
+### 1.3 Data Inspection
+
+```{r}
+summary(data1)
+```
+
+Based on the table above, let's select the variables we need.
+
+```{r}
+data2 <- data1 %>% select(
+  age, job, marital, education, default, balance, housing, loan, duration, campaign, previous, y)
+```
+
+To make it easier to read, we changed some column names.
+
+```{r}
+names(data2)[names(data2) == "y"] <- "result"
+names(data2)[names(data2) == "previous"] <- "campaignbef"
+names(data2)[names(data2) == "campaign"] <- "campaignnow"
+```
+
+Let's check for missing values in our data.
+
+### 1.4 Missing Value
+```{r}
+colSums(is.na(data2))
+```
+
+To make processing easier, let's change our data type.
+
+### 1.5 Data Types
+```{r}
+data3 <- data2 %>%
+  mutate(age = as.numeric(age),  
+         job = as.factor(job),    
+         marital = as.factor(marital),  
+         education = as.factor(education),  
+         default = as.factor(default),   
+         balance = as.numeric(balance),  
+         housing = as.factor(housing),    
+         loan = as.factor(loan),    
+         duration = as.numeric(duration),  
+         campaignnow = as.numeric(campaignnow),  
+         campaignbef = as.numeric(campaignbef),  
+         result = as.factor(result)    
+         )
+```
+
+Once we have finished preparing our data, let's start exploring our data.
+
+# 2. Data Processing
+
+### 2.1 Data Ekploration and Visualization 1
+
+For the first exploration, we will try to answer the business question regarding How many times on average can a campaign achieve success? For this reason, we do aggregation for several variables.
+
+```{r}
+camp <- data3 %>% 
+ group_by(result) %>%
+   summarise(avg_campaign = mean(campaignbef + campaignnow)) %>% 
+  ungroup() %>% 
+   mutate(avg_campaign = round(avg_campaign, 1))
+camp
+```
+
+Visualize the data.
+
+```{r}
+plot1 <- ggplot(camp, aes(x = result, y = avg_campaign, fill = result)) +
+  geom_bar(stat = "identity", width = 0.1) + scale_fill_brewer(palette="Set2") +
+  labs(x = "Result", y = NULL, title = "Average Campaign by Result") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+plot1
+```
+
+Based on the data processing above, from this plot we can see that on average 3.4 new campaigns can produce success until someone wants to carry out the goals of this campaign.
+
+### 2.2 Data Ekploration and Visualization 2
+
+To answer the second question, we try to aggregate based on variables that can group data that describes certain segments.
+
+```{r}
+data3 %>%
+  group_by(age, job, marital, education, balance, housing, loan) %>%
+  summarise(
+    result_yes = sum(result == "yes"),
+    result_no = sum(result == "no")
+  )
+```
+Let's regroup for the job variable.
+
+```{r}
+seg <- data3 %>%
+  filter(result == "yes") %>% 
+group_by(job, result) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  ungroup()
+seg
+```
+
+Visualize for variable job based data.
+
+```{r}
+plot2 <- ggplot(data = seg, aes(x = reorder(job, count), y = count, fill = result)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_brewer(palette="Set2") +
+  labs(title = "Distribution of Job and Education with Result Counts",
+       x = NULL,
+       y = "Count") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none") +
+  coord_flip()
+plot2
+```
+
+We see that the job segment provides a level of success in the campaign, especially management or managerial jobs.
+
+
+### 2.3 Data Ekploration and Visualization 3
+
+This time we aggregate based on savings.
+
+```{r}
+bal <- data3 %>%
+  group_by(result) %>%
+  summarise(median_balance = median(balance, na.rm = TRUE)) %>%
+  ungroup()
+bal
+```
+
+Here's the visualization.
+
+```{r}
+plot3 <- ggplot(bal, aes(x = result, y = median_balance, fill = result)) +
+  geom_bar(stat = "identity") +scale_fill_brewer(palette="Set2") +
+  labs(title = "Median Balance by Result",
+       x = "Result",
+       y = NULL) +
+  theme_minimal()
+plot3
+```
+
+
+Based on the median savings that have the potential for success in this campaign, it is worth 12,518,522 Rupiah or 710 Euros.
+
+### 2.4 Data Ekploration and Visualization 4
+
+Next, let's try to aggregate it based on debt.
+
+```{r}
+loany <- data3 %>%
+  filter(result == "yes") %>% 
+group_by(loan, housing, result) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  ungroup()
+loany
+```
+It can be seen that the data still needs to be summarized again, let's try manipulating it into several groups by aggregation.
+
+```{r}
+loann <- data3 %>%
+  filter(result == "no") %>% 
+group_by(loan, housing, result) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  ungroup()
+loann
+```
+
+After that, provide a new column with descriptive data to clarify the group.
+
+```{r}
+loan1 <- loany %>%
+  mutate(group_yes = paste0("housing - ", housing, " & loan - ", loan)) %>%
+  select(group_yes, count)
+loan1
+```
+
+Here's the visualization.
+
+```{r}
+# Compute the cumulative percentages (top of each rectangle)
+loan1$fraction <- loan1$count / sum(loan1$count)
+
+# Compute the cumulative percentages (top of each rectangle)
+loan1$ymax <- cumsum(loan1$fraction)
+
+# Compute the bottom of each rectangle
+loan1$ymin <- c(0, head(loan1$ymax, n=-1))
+
+# Compute label position
+loan1$labelPosition <- (loan1$ymax + loan1$ymin) / 2
+
+# Compute a good label
+loan1$label <- paste0(loan1$count)
+
+# Make the plot
+plot4 <- ggplot(loan1, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=group_yes)) +
+  geom_rect(color="black") +
+  geom_text(x=2.5, aes(y=labelPosition, label=count), color="black", size=4) +
+  scale_fill_brewer(palette="Set2") +
+  scale_color_brewer(palette="Set1") +
+  coord_polar(theta="y") +
+  xlim(c(-1, 4)) +
+  theme_void() +
+  labs(title = "Doughnut Chart of Success Campaign Result Base on Loan")+
+  guides(fill = guide_legend(title = "Group"))
+plot4
+```
+
+
+Based on the data above, the best potential is someone who has no mortgage payments and no debt with a total of 283 data.
+
+# 3. Conclusion & Business Recomendation   
+
+Based on the data above, we conclude in the form of recommendations as follows
+To increase success in this campaign, there are several steps that need to be taken. Firstly, increase the number of campaigns, based on the statistical data above to achieve success in a campaign, on average it requires **3.4** campaigns. It is unfortunate that the campaign failure ratio is also seen after **3.3** campaigns have been carried out, with a difference of **0.1** in the statistical value of success and failure, we need to improve other variables.
+Another variable needed is what segments can increase success. We tried to explore data with various variables, namely the ratio of job debt and savings. We concluded that the job variable provided quite significant value to the campaign success ratio. So increase the focus on job segmentation in the **management/managerial** section of the company and the savings value is above the median, namely **710**. This will increase the success of the campaign.
+
+# 4. Dataset
+
+```{r echo=FALSE}
+datatable(data1, options = list(
+  scrollX = TRUE, pageLength = 5))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 

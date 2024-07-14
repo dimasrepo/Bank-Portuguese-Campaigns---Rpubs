@@ -1,0 +1,11 @@
+Variable Name,Role,Type,Demographic,Description,Units,Missing Values
+age,Feature,Integer,Age,,,no
+job,Feature,Categorical,Occupation,"type of job (categorical: 'admin.','blue-collar','entrepreneur','housemaid','management','retired','self-employed','services','student','technician','unemployed','unknown')",,no
+marital,Feature,Categorical,Marital Status,"marital status (categorical: 'divorced','married','single','unknown'; note: 'divorced' means divorced or widowed)",,no
+education,Feature,Categorical,Education Level,"(categorical: 'basic.4y','basic.6y','basic.9y','high.school','illiterate','professional.course','university.degree','unknown')",,no
+default,Feature,Binary,,has credit in default?,,no
+balance,Feature,Integer,,average yearly balance,euros,no
+housing,Feature,Binary,,has housing loan?,,no
+loan,Feature,Binary,,has personal loan?,,no
+contact,Feature,Categorical,,"contact communication type (categorical: 'cellular','telephone')",,yes
+day_of_week,Feature,Date,,last contact day of the week,,no
